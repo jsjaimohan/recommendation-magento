@@ -1,4 +1,9 @@
 # Product Requirements Document (PRD)
+
+**Developer:** J S JAIMOHAN  
+**Email:** jsjaimohan@gmail.com  
+**License:** Private License
+
 ## Magento Recommendation Microservice
 
 ### 1. Executive Summary

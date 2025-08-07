@@ -1,4 +1,9 @@
 # API Documentation
+
+**Developer:** J S JAIMOHAN  
+**Email:** jsjaimohan@gmail.com  
+**License:** Private License
+
 ## Magento Recommendation Microservice
 
 ### Base URL
