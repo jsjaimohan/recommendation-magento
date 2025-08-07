@@ -26,7 +26,12 @@ class BehaviorService:
             
             success = db_manager.save_user_behavior(behavior_data)
             if not success:
-                raise Exception("Failed to save behavior")
+                logger.error(f"Failed to save behavior for {behavior.user_id}")
+                return {
+                    "message": "Failed to track behavior",
+                    "user_id": behavior.user_id,
+                    "status": "error"
+                }
             
             logger.info(f"Behavior tracked: {behavior.user_id} -> {behavior.product_id} ({behavior.behavior_type})")
             
@@ -38,8 +43,12 @@ class BehaviorService:
             }
             
         except Exception as e:
-            logger.error(f"Behavior tracking error: {e}")
-            raise
+            logger.error(f"Behavior tracking error for {behavior.user_id}: {e}")
+            return {
+                "message": "Failed to track behavior",
+                "user_id": behavior.user_id,
+                "status": "error"
+            }
     
     def get_user_behaviors(self, user_id: str, limit: int = 100) -> Dict[str, Any]:
         """Get user behaviors"""
@@ -51,8 +60,13 @@ class BehaviorService:
                 "count": len(behaviors)
             }
         except Exception as e:
-            logger.error(f"Error getting user behaviors: {e}")
-            raise
+            logger.error(f"Error getting user behaviors for {user_id}: {e}")
+            # Return safe default instead of raising exception
+            return {
+                "user_id": user_id,
+                "behaviors": [],
+                "count": 0
+            }
     
     def get_user_stats(self, user_id: str) -> Dict[str, Any]:
         """Get user statistics"""
@@ -60,5 +74,11 @@ class BehaviorService:
             stats = db_manager.get_user_stats(user_id)
             return stats
         except Exception as e:
-            logger.error(f"Error getting user stats: {e}")
-            raise
+            logger.error(f"Error getting user stats for {user_id}: {e}")
+            # Return safe default instead of raising exception
+            return {
+                "user_id": user_id,
+                "behavior_counts": {},
+                "unique_products": 0,
+                "recent_activity_7_days": 0
+            }

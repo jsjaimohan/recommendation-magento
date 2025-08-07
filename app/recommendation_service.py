@@ -113,7 +113,8 @@ class RecommendationService:
             
         except Exception as e:
             logger.error(f"Error training models: {e}")
-            raise
+            # Don't raise exception, let the calling code handle it gracefully
+            self.is_trained = False
     
     def get_trending_products(self, category: Optional[str] = None, limit: int = 10, timeframe_days: int = 7):
         """Get trending products based on recent behavior"""
@@ -223,8 +224,13 @@ class RecommendationService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting recommendations: {e}")
-            raise
+            logger.error(f"Error getting recommendations for user {user_id}: {e}")
+            # Return empty recommendations instead of raising exception
+            return {
+                "recommendations": [],
+                "algorithm": algorithm,
+                "execution_time": time.time() - start_time
+            }
     
     def _get_user_based_recommendations(self, user_id: str, n_recommendations: int):
         """User-based collaborative filtering"""
