@@ -29,12 +29,9 @@ A microservice for providing personalized product recommendations to Magento e-c
 
 ## 📚 Documentation
 
-- [Product Requirements Document](docs/PRD.md)
-- [Technical Architecture](docs/ARCHITECTURE.md)
-- [API Documentation](docs/API_DOCUMENTATION.md)
-- [Implementation Guide](docs/IMPLEMENTATION_GUIDE.md)
-- [Testing Guide](docs/TESTING_GUIDE.md)
-- [Refactored Structure](docs/REFACTORED_STRUCTURE.md)
+- [Architecture](docs/Architecture.md) - System design and components
+- [API](docs/API.md) - Complete API documentation and examples
+- [ML](docs/ML.md) - Machine learning algorithms and implementation
 
 ## 🚀 Quick Start
 

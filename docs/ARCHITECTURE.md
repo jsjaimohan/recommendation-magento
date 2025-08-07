@@ -1,487 +1,443 @@
-# Technical Architecture
+# Architecture Documentation
 
 **Developer:** J S JAIMOHAN  
 **Email:** jsjaimohan@gmail.com  
 **License:** Private License
 
-## Magento Recommendation Microservice
+## Overview
 
-### 1. System Overview
-The Magento Recommendation Microservice is designed as a scalable, fault-tolerant microservice that provides personalized product recommendations to a specific Magento e-commerce installation. The system follows a simplified microservices architecture pattern with clear separation of concerns, horizontal scalability, and robust data processing capabilities.
+This document provides a comprehensive overview of the Magento Recommendation System architecture, including system design, components, data flow, and deployment.
 
-**Simplified Architecture Benefits**:
-- **Reduced Complexity**: No authentication/authorization overhead
-- **Faster Development**: Direct integration with Magento
-- **Lower Resource Usage**: Fewer components to maintain
-- **Simplified Deployment**: Less infrastructure requirements
-- **Easier Testing**: No complex auth flows to test
+## 🏗️ System Architecture
 
-### 2. High-Level Architecture
+### High-Level Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Magento      │    │   Load Balancer │    │   API Gateway   │
-│   Store        │◄──►│   (Nginx)       │◄──►│   (Nginx)       │
+│   Magento       │    │  Recommendation │    │   Database      │
+│   Frontend      │◄──►│     API         │◄──►│   (MariaDB)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                        │
-                                                        ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Recommendation Service                       │
-├─────────────────┬─────────────────┬─────────────────┬─────────┤
-│  User Service   │  Analytics      │  ML Engine      │  Cache  │
-│                 │   Service       │                 │ Service │
-└─────────────────┴─────────────────┴─────────────────┴─────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        Data Layer                              │
-├─────────────────┬─────────────────┬─────────────────┬─────────┤
-│   PostgreSQL    │   Redis Cache   │   Elasticsearch │  ML     │
-│   (Primary DB)  │   (Session)     │   (Analytics)   │ Models  │
-└─────────────────┴─────────────────┴─────────────────┴─────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   Cache         │
+                       │   (Redis)       │
+                       └─────────────────┘
 ```
 
-### 3. Service Components
+### Component Architecture
 
-#### 3.1 API Gateway Layer
-**Technology**: Nginx or simple load balancer
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FastAPI Application                     │
+├─────────────────────────────────────────────────────────────┤
+│  Controllers (API Layer)                                  │
+│  ├── Health Endpoints                                     │
+│  ├── Recommendation Endpoints                             │
+│  ├── Behavior Tracking Endpoints                          │
+│  └── Model Management Endpoints                           │
+├─────────────────────────────────────────────────────────────┤
+│  Services (Business Logic)                                │
+│  ├── RecommendationService (ML Engine)                    │
+│  ├── BehaviorService (User Analytics)                     │
+│  └── HealthService (System Monitoring)                    │
+├─────────────────────────────────────────────────────────────┤
+│  Models (Data Layer)                                      │
+│  ├── Pydantic Models (Validation)                         │
+│  └── Database Models (Persistence)                        │
+├─────────────────────────────────────────────────────────────┤
+│  External Dependencies                                    │
+│  ├── MariaDB (Data Storage)                               │
+│  ├── Redis (Caching)                                      │
+│  └── scikit-learn (ML Algorithms)                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 📁 File Structure
+
+```
+Magento-Recommendation/
+├── app/
+│   ├── main.py                     # Main FastAPI application
+│   ├── models.py                   # Pydantic models/schemas
+│   ├── recommendation_service.py    # ML and recommendation logic
+│   ├── behavior_service.py         # User behavior tracking
+│   ├── health_service.py           # Health checks and monitoring
+│   └── database.py                 # Database operations
+├── docs/
+│   ├── Architecture.md             # This document
+│   ├── API.md                      # API documentation
+│   └── ML.md                       # Machine learning documentation
+├── scripts/
+│   ├── sample_data.py              # Sample data generation
+│   └── test_complete_flow.py       # Comprehensive testing
+├── docker-compose.yml              # Multi-service orchestration
+├── Dockerfile                      # Application containerization
+├── requirements.txt                # Python dependencies
+├── init.sql                        # Database schema
+├── README.md                       # Project overview
+├── LICENSE                         # Private license
+└── AUTHOR.md                       # Author information
+```
+
+## 🧩 Component Details
+
+### 1. API Layer (`main.py`)
+
+**Purpose**: HTTP endpoints and request handling
+
 **Responsibilities**:
-- Request routing and load balancing
-- Rate limiting and throttling
-- Request/response transformation
-- CORS management
-- Request logging and monitoring
+- Route definitions and request/response handling
+- Input validation and error management
+- Service orchestration
+- CORS and middleware configuration
 
-#### 3.2 Core Services
-
-##### Authentication Service (Optional)
-**Purpose**: Simple API key validation for internal Magento integration
 **Key Features**:
-- API key validation
-- Basic request logging
-- IP whitelisting (optional)
-- Simple rate limiting
+- FastAPI framework for high performance
+- Automatic API documentation (Swagger/OpenAPI)
+- Built-in validation with Pydantic
+- Graceful error handling without stack traces
 
-##### User Service
-**Purpose**: Manage user profiles and preferences
-**Key Features**:
-- User profile management
-- User preferences and behavior tracking
-- User segmentation and targeting
-- Privacy and GDPR compliance
-- User data anonymization
-- Preference learning algorithms
+### 2. Service Layer
 
-##### Recommendation Service
-**Purpose**: Core recommendation engine
-**Key Features**:
-- Multi-algorithm recommendation generation
-- Real-time recommendation updates
-- A/B testing framework
-- Performance optimization
-- Cache management
-- Algorithm selection based on context
+#### RecommendationService (`recommendation_service.py`)
 
-##### Analytics Service
-**Purpose**: Track and analyze recommendation performance
-**Key Features**:
-- User behavior analytics
-- Recommendation performance tracking
-- A/B testing support
-- Business intelligence reporting
-- Real-time dashboards
-- Predictive analytics
+**Responsibilities**:
+- ML model training and management
+- Recommendation generation using multiple algorithms
+- Trending products calculation
+- Model persistence (save/load)
 
-##### ML Engine
-**Purpose**: Machine learning model management
-**Key Features**:
-- Model training and deployment
-- Feature engineering pipeline
-- Model versioning and rollback
-- Automated retraining
-- Model performance monitoring
-- Algorithm optimization
+**Key Methods**:
+- `prepare_data()` - Data preparation for training
+- `train_models()` - Train all recommendation algorithms
+- `get_recommendations()` - Generate personalized recommendations
+- `get_trending_products()` - Calculate trending products
+- `save_model()` / `load_model()` - Model persistence
 
-### 4. Data Architecture
+#### BehaviorService (`behavior_service.py`)
 
-#### 4.1 Database Design
+**Responsibilities**:
+- User behavior tracking and analytics
+- Behavior data validation and storage
+- User statistics generation
 
-##### Users Table
+**Key Methods**:
+- `track_behavior()` - Save user behavior to database
+- `get_user_behaviors()` - Retrieve user behavior history
+- `get_user_stats()` - Generate user analytics
+
+#### HealthService (`health_service.py`)
+
+**Responsibilities**:
+- System health monitoring
+- Service status checks
+- Connection testing
+
+**Key Methods**:
+- `get_health_status()` - Comprehensive health check
+- `get_root_info()` - Basic API information
+
+### 3. Models Layer (`models.py`)
+
+**Purpose**: Data validation and serialization
+
+**Contains**: All Pydantic models for requests/responses
+
+**Benefits**:
+- Type safety and automatic validation
+- Clear API contracts
+- Automatic documentation generation
+
+## 🔄 Data Flow
+
+### Recommendation Generation Flow
+
+```
+1. HTTP Request → FastAPI Route
+2. Input Validation → Pydantic Models
+3. Service Call → RecommendationService
+4. Database Query → MariaDB
+5. ML Processing → scikit-learn
+6. Cache Check → Redis
+7. Response Format → JSON
+8. HTTP Response → Client
+```
+
+### Behavior Tracking Flow
+
+```
+1. User Action → Magento Frontend
+2. Behavior Data → API Endpoint
+3. Validation → Pydantic Models
+4. Storage → MariaDB
+5. Analytics → BehaviorService
+6. Response → Confirmation
+```
+
+## 🗄️ Database Architecture
+
+### MariaDB Schema
+
 ```sql
+-- Users table (simplified for internal use)
 CREATE TABLE users (
-    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    name VARCHAR(255),
-    preferences JSONB DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_active_at TIMESTAMP,
-    status VARCHAR(50) DEFAULT 'active'
+    user_id VARCHAR(50) PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-```
 
-##### User_Behaviors Table
-```sql
-CREATE TABLE user_behaviors (
-    behavior_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(user_id),
-    product_id VARCHAR(255) REFERENCES products(product_id),
-    behavior_type VARCHAR(50) NOT NULL, -- view, cart, purchase, wishlist
-    session_id VARCHAR(255),
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    metadata JSONB DEFAULT '{}',
-    ip_address INET,
-    user_agent TEXT
-);
-```
-
-##### Products Table
-```sql
+-- Products table
 CREATE TABLE products (
-    product_id VARCHAR(255) PRIMARY KEY,
+    product_id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     category VARCHAR(100),
     subcategory VARCHAR(100),
     price DECIMAL(10,2),
-    attributes JSONB DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(50) DEFAULT 'active'
-);
-```
-
-##### Recommendations Table
-```sql
-CREATE TABLE recommendations (
-    recommendation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(user_id),
-    product_id VARCHAR(255) REFERENCES products(product_id),
-    score DECIMAL(5,4),
-    algorithm_used VARCHAR(100),
-    context JSONB DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP
-);
-```
-
-##### A/B Tests Table
-```sql
-CREATE TABLE ab_tests (
-    test_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    variants JSONB NOT NULL,
-    traffic_split JSONB NOT NULL,
-    start_date TIMESTAMP,
-    end_date TIMESTAMP,
-    status VARCHAR(50) DEFAULT 'active',
+    attributes JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- User behaviors table
+CREATE TABLE user_behaviors (
+    behavior_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    product_id VARCHAR(50) NOT NULL,
+    behavior_type ENUM('view', 'cart', 'purchase', 'wishlist'),
+    session_id VARCHAR(100),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metadata JSON,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+-- Recommendations table
+CREATE TABLE recommendations (
+    recommendation_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    product_id VARCHAR(50) NOT NULL,
+    score DECIMAL(5,4),
+    algorithm_used VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+-- A/B testing table
+CREATE TABLE ab_tests (
+    test_id INT AUTO_INCREMENT PRIMARY KEY,
+    test_name VARCHAR(100) NOT NULL,
+    user_id VARCHAR(50) NOT NULL,
+    variant VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
 ```
 
-#### 4.2 Performance Indexes
-```sql
--- User behavior indexes
-CREATE INDEX CONCURRENTLY idx_user_behaviors_user_id ON user_behaviors(user_id);
-CREATE INDEX CONCURRENTLY idx_user_behaviors_timestamp ON user_behaviors(timestamp);
-CREATE INDEX CONCURRENTLY idx_user_behaviors_type ON user_behaviors(behavior_type);
-CREATE INDEX CONCURRENTLY idx_user_behaviors_user_product ON user_behaviors(user_id, product_id);
+## 🔧 Technology Stack
 
--- Recommendation indexes
-CREATE INDEX CONCURRENTLY idx_recommendations_user_id ON recommendations(user_id);
-CREATE INDEX CONCURRENTLY idx_recommendations_score ON recommendations(score DESC);
-CREATE INDEX CONCURRENTLY idx_recommendations_algorithm ON recommendations(algorithm_used);
+### Backend Framework
+- **FastAPI**: Modern Python web framework
+- **Python 3.11**: Latest stable Python version
+- **Uvicorn**: ASGI server for production
 
--- Product indexes
-CREATE INDEX CONCURRENTLY idx_products_category ON products(category);
-CREATE INDEX CONCURRENTLY idx_products_price ON products(price);
-CREATE INDEX CONCURRENTLY idx_products_status ON products(status);
+### Machine Learning
+- **scikit-learn**: Primary ML library
+- **pandas**: Data manipulation
+- **numpy**: Numerical computations
+- **pickle**: Model serialization
 
--- Composite indexes for complex queries
-CREATE INDEX CONCURRENTLY idx_user_behaviors_complex ON user_behaviors(user_id, behavior_type, timestamp DESC);
-```
+### Database & Caching
+- **MariaDB**: Primary database
+- **Redis**: Caching layer
+- **SQLAlchemy**: ORM for database operations
 
-#### 4.3 Caching Strategy
-**Redis Cache Layers**:
-- **L1 Cache**: Application-level in-memory cache (Node.js)
-- **L2 Cache**: Redis distributed cache
-- **L3 Cache**: CDN for static content
+### Containerization
+- **Docker**: Application containerization
+- **Docker Compose**: Multi-service orchestration
 
-**Cache Keys**:
-```
-recommendations:{user_id}:{algorithm}:{limit}
-user_preferences:{user_id}
-product_details:{product_id}
-trending_products:{category}:{timeframe}
-```
+### Development Tools
+- **Pydantic**: Data validation
+- **Logging**: Python logging module
+- **Testing**: pytest (for future implementation)
 
-### 5. Technology Stack
+## 🚀 Deployment Architecture
 
-#### 5.1 Backend Technologies
-- **Runtime**: Node.js 18.x with TypeScript
-- **Framework**: Express.js or Fastify
-- **Database**: PostgreSQL 15.x (primary), Redis 7.x (cache)
-- **Search**: Elasticsearch 8.x
-- **Message Queue**: RabbitMQ or Apache Kafka
-- **API Documentation**: Swagger/OpenAPI 3.0
+### Docker Compose Services
 
-#### 5.2 Machine Learning Stack
-- **Framework**: TensorFlow.js or Python with FastAPI
-- **Algorithms**: 
-  - Collaborative filtering (user-based, item-based)
-  - Content-based filtering
-  - Matrix factorization
-  - Deep learning models
-- **Model Serving**: TensorFlow Serving or custom API
-- **Feature Store**: Redis or dedicated feature store
-
-#### 5.3 Infrastructure & DevOps
-- **Containerization**: Docker
-- **Orchestration**: Kubernetes
-- **CI/CD**: GitHub Actions or GitLab CI
-- **Monitoring**: Prometheus + Grafana
-- **Logging**: ELK Stack (Elasticsearch, Logstash, Kibana)
-- **Tracing**: Jaeger or Zipkin
-
-#### 5.4 Security Stack
-- **Authentication**: Simple API key validation (optional)
-- **Encryption**: TLS 1.3, AES-256
-- **Rate Limiting**: Redis-based rate limiter
-- **Input Validation**: Joi or Zod
-- **Security Headers**: Helmet.js
-- **Network Security**: IP whitelisting (optional)
-
-### 6. Security Architecture
-
-#### 6.1 Authentication & Authorization
-**Simplified Security**:
-1. **API Gateway Level**: Rate limiting, IP filtering (optional)
-2. **Application Level**: Simple API key validation (optional)
-3. **Database Level**: Connection encryption
-
-**API Key Structure** (if needed):
-```json
-{
-  "api_key": "magento-recommendation-key-2024",
-  "store_id": "magento-store-123",
-  "permissions": ["read:recommendations", "write:behaviors"],
-  "created_at": "2024-01-15T10:30:00Z"
-}
-```
-
-#### 6.2 Data Security
-- **Encryption at Rest**: AES-256 for sensitive data
-- **Encryption in Transit**: TLS 1.3 for all communications
-- **Data Anonymization**: PII removal for analytics
-- **GDPR Compliance**: Data retention policies, right to be forgotten
-- **Audit Logging**: Complete audit trail for all operations
-
-#### 6.3 Network Security
-- **VPC**: Isolated network segments
-- **Firewall**: Application and network-level firewalls
-- **DDoS Protection**: Cloud-based DDoS mitigation
-- **SSL/TLS**: End-to-end encryption
-- **API Security**: OAuth 2.0, API key rotation
-
-### 7. Scalability Patterns
-
-#### 7.1 Horizontal Scaling
-**Stateless Design**:
-- No session state stored in application
-- All state managed by external services (Redis, Database)
-- Load balancer can route requests to any instance
-
-**Database Scaling**:
-- **Read Replicas**: Multiple read-only database instances
-- **Connection Pooling**: Efficient database connection management
-- **Sharding**: Horizontal partitioning for large datasets
-
-#### 7.2 Performance Optimization
-**Caching Strategy**:
-- **Application Cache**: In-memory caching for frequently accessed data
-- **Database Cache**: Query result caching
-- **CDN**: Static content delivery
-- **Edge Caching**: Geographic distribution
-
-**Database Optimization**:
-- **Indexing**: Strategic index placement
-- **Query Optimization**: Efficient SQL queries
-- **Connection Pooling**: Database connection management
-- **Read/Write Splitting**: Separate read and write operations
-
-### 8. Monitoring & Observability
-
-#### 8.1 Metrics Collection
-**Application Metrics**:
-- Response time and throughput
-- Error rates and availability
-- Business metrics (conversion rates, revenue impact)
-- Custom metrics for recommendation performance
-
-**Infrastructure Metrics**:
-- CPU, memory, and disk usage
-- Network I/O and bandwidth
-- Database performance metrics
-- Cache hit/miss ratios
-
-#### 8.2 Logging Strategy
-**Structured Logging**:
-```json
-{
-  "timestamp": "2024-01-15T10:30:00Z",
-  "level": "info",
-  "service": "recommendation-service",
-  "request_id": "req_abc123",
-  "user_id": "12345",
-  "action": "get_recommendations",
-  "duration_ms": 45,
-  "result": "success"
-}
-```
-
-**Log Aggregation**:
-- Centralized log collection
-- Real-time log analysis
-- Log retention policies
-- Security event monitoring
-
-#### 8.3 Alerting System
-**Alert Categories**:
-- **Critical**: Service down, high error rates
-- **Warning**: Performance degradation, resource usage
-- **Info**: Business metrics, user activity
-
-**Alert Channels**:
-- Email notifications
-- Slack/Teams integration
-- PagerDuty escalation
-- SMS for critical alerts
-
-### 9. Deployment Architecture
-
-#### 9.1 Container Strategy
-**Multi-stage Dockerfile**:
-```dockerfile
-# Build stage
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Production stage
-FROM node:18-alpine AS production
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
-RUN npm ci --only=production
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
-#### 9.2 Kubernetes Deployment
-**Deployment Configuration**:
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: recommendation-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: recommendation-service
-  template:
-    metadata:
-      labels:
-        app: recommendation-service
-    spec:
-      containers:
-      - name: recommendation-service
-        image: recommendation-service:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: NODE_ENV
-          value: "production"
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: db-secret
-              key: url
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
+services:
+  recommendation-api:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mariadb
+      - redis
+    environment:
+      - DATABASE_URL=mysql://user:password@mariadb:3306/recommendations
+      - REDIS_URL=redis://redis:6379
+
+  mariadb:
+    image: mariadb:10.11
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=recommendations
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
 ```
 
-#### 9.3 Service Mesh (Optional)
-**Istio Configuration**:
-- Traffic management and load balancing
-- Service-to-service authentication
-- Observability and monitoring
-- Fault injection and testing
+### Production Considerations
 
-### 10. Disaster Recovery
+1. **Scaling**: Horizontal scaling with load balancers
+2. **Monitoring**: Application metrics and health checks
+3. **Security**: API key authentication and input validation
+4. **Backup**: Database backup strategies
+5. **Logging**: Centralized logging and error tracking
 
-#### 10.1 Backup Strategy
-**Database Backups**:
-- Automated daily backups
-- Point-in-time recovery capability
-- Cross-region backup replication
-- Backup encryption
+## 🔒 Security Architecture
 
-**Application Backups**:
-- Configuration management
-- Code repository backups
-- Infrastructure as Code (IaC) backups
+### Authentication & Authorization
+- **API Key Authentication**: For sensitive endpoints
+- **Input Validation**: Prevents injection attacks
+- **Rate Limiting**: Prevents abuse
+- **Data Sanitization**: Removes sensitive information
 
-#### 10.2 Recovery Procedures
-**RTO (Recovery Time Objective)**: 4 hours
-**RPO (Recovery Point Objective)**: 1 hour
+### Data Protection
+- **Database Security**: Encrypted connections
+- **Cache Security**: Redis authentication
+- **Error Handling**: No stack trace exposure
+- **Access Logging**: Security monitoring
 
-**Recovery Steps**:
-1. Infrastructure restoration
-2. Database recovery
-3. Application deployment
-4. Service verification
-5. Traffic restoration
+## 📊 Performance Architecture
 
-### 11. Performance Benchmarks
+### Caching Strategy
+- **Redis Caching**: Frequently accessed recommendations
+- **Cache TTL**: 1 hour for recommendation results
+- **Cache Keys**: User-specific recommendation keys
 
-#### 11.1 Response Time Targets
-- **Recommendation API**: < 200ms (95th percentile)
-- **Behavior Tracking**: < 50ms (95th percentile)
-- **User Profile**: < 100ms (95th percentile)
-- **Analytics**: < 500ms (95th percentile)
+### Database Optimization
+- **Indexed Queries**: Fast user behavior retrieval
+- **Connection Pooling**: Efficient database connections
+- **Query Optimization**: Minimal database load
 
-#### 11.2 Throughput Targets
-- **Recommendations**: 10,000 requests/minute
-- **Behavior Tracking**: 50,000 events/minute
-- **User Management**: 1,000 requests/minute
-- **Analytics**: 5,000 requests/minute
+### ML Performance
+- **Model Caching**: Pre-trained models in memory
+- **Batch Processing**: Efficient recommendation generation
+- **Algorithm Selection**: Fastest algorithm for user type
 
-#### 11.3 Availability Targets
-- **Uptime**: 99.9% (8.76 hours downtime/year)
-- **Error Rate**: < 0.1%
-- **Data Consistency**: 99.99%
+## 🔄 Integration Architecture
 
-### 12. Cost Optimization
+### Magento Integration
+- **RESTful APIs**: Standard HTTP endpoints
+- **JSON Responses**: Easy integration with frontend
+- **Error Handling**: Graceful failure responses
+- **Rate Limiting**: Prevents API abuse
 
-#### 12.1 Resource Optimization
-- **Auto-scaling**: Based on CPU/memory usage
-- **Spot Instances**: For non-critical workloads
-- **Reserved Instances**: For predictable workloads
-- **Resource right-sizing**: Regular capacity planning
+### External Systems
+- **Database**: MariaDB for persistent storage
+- **Cache**: Redis for performance optimization
+- **Monitoring**: Health check endpoints
+- **Logging**: Structured logging for debugging
 
-#### 12.2 Data Optimization
-- **Data Lifecycle**: Automated data archival
-- **Compression**: Database and cache compression
-- **Efficient Queries**: Optimized database queries
+## 🧪 Testing Architecture
+
+### Testing Strategy
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Service interaction testing
+- **End-to-End Tests**: Complete workflow testing
+- **Performance Tests**: Load and stress testing
+
+### Test Data
+- **Sample Data Generation**: Realistic test scenarios
+- **Database Seeding**: Consistent test environment
+- **Mock Services**: Isolated component testing
+
+## 📈 Monitoring & Observability
+
+### Health Checks
+- **API Health**: Service availability
+- **Database Health**: Connection status
+- **Cache Health**: Redis connectivity
+- **Model Health**: ML model status
+
+### Metrics
+- **Response Times**: API performance
+- **Error Rates**: System reliability
+- **Cache Hit Rates**: Performance optimization
+- **Recommendation Quality**: ML model effectiveness
+
+## 🔧 Configuration Management
+
+### Environment Variables
+```bash
+# Database Configuration
+DATABASE_URL=mysql://user:password@mariadb:3306/recommendations
+
+# Redis Configuration
+REDIS_URL=redis://redis:6379
+
+# API Configuration
+API_KEY=magento-recommendation-key-2024
+MAX_REQUESTS_PER_MINUTE=10
+
+# ML Configuration
+MODEL_CACHE_TTL=3600
+MAX_RECOMMENDATIONS=10
+```
+
+### Configuration Files
+- **Docker Compose**: Service orchestration
+- **Requirements**: Python dependencies
+- **Database Schema**: SQL initialization
+- **Logging**: Application logging configuration
+
+## 🚀 Deployment Strategies
+
+### Development Environment
+- **Local Docker**: Complete local development
+- **Hot Reloading**: Fast development iteration
+- **Debug Logging**: Detailed error information
+
+### Production Environment
+- **Container Orchestration**: Kubernetes or Docker Swarm
+- **Load Balancing**: Multiple API instances
+- **Database Clustering**: High availability
+- **Monitoring**: Comprehensive observability
+
+## 📋 Best Practices
+
+### Code Organization
+- **Service Layer**: Business logic separation
+- **Model Layer**: Data validation and contracts
+- **API Layer**: HTTP handling and routing
+- **Database Layer**: Data persistence
+
+### Error Handling
+- **Graceful Degradation**: System continues with errors
+- **User-Friendly Messages**: Clear error responses
+- **Logging**: Detailed error tracking
+- **Monitoring**: Proactive error detection
+
+### Performance
 - **Caching**: Reduce database load
+- **Connection Pooling**: Efficient resource usage
+- **Batch Processing**: Optimize ML operations
+- **Async Processing**: Non-blocking operations
 
-This comprehensive architecture document provides a complete technical foundation for building a scalable, secure, and high-performance Magento Recommendation Microservice.
+## 📞 Support
+
+For architecture-related questions:
+- **Email:** jsjaimohan@gmail.com
+- **Developer:** J S JAIMOHAN
+
+This architecture is designed for internal Magento integration with focus on simplicity, maintainability, and performance. 
