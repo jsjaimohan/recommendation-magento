@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  recommendation-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=mysql://recommendation_user:password@mariadb:3306/recommendations
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./app:/app
+      - ./models:/app/models
+    depends_on:
+      - mariadb
+      - redis
+    networks:
+      - recommendation-network
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:10.11
+    environment:
+      - MYSQL_DATABASE=recommendations
+      - MYSQL_USER=recommendation_user
+      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - recommendation-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - recommendation-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  mariadb_data:
+  redis_data:
+
+networks:
+  recommendation-network:
+    driver: bridge
