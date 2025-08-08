@@ -4,67 +4,39 @@
 **Email:** jsjaimohan@gmail.com  
 **License:** Private License
 
-## Overview
-
-This document provides comprehensive API documentation for the Magento Recommendation System, including all endpoints, request/response formats, authentication, and usage examples.
-
-## 🔗 Base URLs
-
+## Base URL
 ```
-Development: http://localhost:8000
-Production: https://api.recommendations.magento.com
+http://localhost:8000
 ```
 
-## 🔐 Authentication
-
-### API Key Authentication
-
-For sensitive endpoints, API key authentication is required:
-
-```bash
-# Header format
+## Authentication
+For sensitive endpoints, include the API key in headers:
+```
 X-API-Key: magento-recommendation-key-2024
 ```
 
-**Valid API Keys:**
-- `magento-recommendation-key-2024`
-- `internal-api-key`
+## Rate Limiting
+- **User Stats Endpoint:** 10 requests per minute per user
+- **Other Endpoints:** No rate limiting currently
 
-### Rate Limiting
-
-- **General endpoints**: 100 requests per minute
-- **User statistics**: 10 requests per minute per user
-- **Model training**: 5 requests per minute
-
-## 📊 Response Formats
-
-### Success Response
+## Response Format
+All responses are in JSON format with the following structure:
 ```json
 {
-  "status": "success",
-  "data": { ... },
-  "timestamp": "2024-01-15T10:30:00Z"
+  "status": "success|error",
+  "data": {...},
+  "message": "Optional message"
 }
 ```
 
-### Error Response
-```json
-{
-  "status": "error",
-  "message": "User-friendly error message",
-  "timestamp": "2024-01-15T10:30:00Z"
-}
+## Health Endpoints
+
+### GET /
+**Root endpoint with basic information**
+```bash
+curl http://localhost:8000/
 ```
-
-## 🏥 Health Endpoints
-
-### GET / - Root Endpoint
-
-**Description**: Get basic API information
-
-**Authentication**: None required
-
-**Response**:
+**Response:**
 ```json
 {
   "message": "Magento Recommendation API",
@@ -75,418 +47,93 @@ X-API-Key: magento-recommendation-key-2024
 }
 ```
 
-### GET /health - Health Check
-
-**Description**: Comprehensive system health check
-
-**Authentication**: None required
-
-**Response**:
+### GET /health
+**Health check endpoint**
+```bash
+curl http://localhost:8000/health
+```
+**Response:**
 ```json
 {
   "status": "healthy",
   "timestamp": "2024-01-15T10:30:00Z",
   "version": "1.0.0",
   "services": {
-    "api": "healthy",
-    "recommendation_engine": "ready",
     "database": "connected",
-    "redis": "connected"
+    "redis": "connected",
+    "ml_engine": "ready"
   }
 }
 ```
 
-## 🧠 Machine Learning Endpoints
+## Machine Learning Endpoints
 
-### POST /train - Train Models
-
-**Description**: Train recommendation models with provided data
-
-**Authentication**: None required
-
-**Request Body**:
-```json
-{
-  "user_behaviors": [
-    {
-      "user_id": "user_123",
-      "product_id": "PROD001",
-      "behavior_type": "purchase",
-      "timestamp": "2024-01-15T10:30:00Z",
-      "session_id": "sess_abc123",
-      "metadata": {
-        "page_url": "/product/PROD001",
-        "referrer": "search"
+### POST /train
+**Train recommendation models with provided data**
+```bash
+curl -X POST http://localhost:8000/train \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_behaviors": [
+      {
+        "user_id": "user_001",
+        "product_id": "PROD001",
+        "behavior_type": "purchase",
+        "timestamp": "2024-01-15T10:30:00Z"
       }
-    }
-  ],
-  "product_data": [
-    {
-      "product_id": "PROD001",
-      "name": "iPhone 15 Pro",
-      "category": "electronics",
-      "subcategory": "smartphones",
-      "price": 999.99,
-      "attributes": {
-        "brand": "Apple",
-        "color": "Titanium",
-        "storage": "256GB"
+    ],
+    "product_data": [
+      {
+        "product_id": "PROD001",
+        "name": "iPhone 15 Pro",
+        "category": "electronics",
+        "price": 999.99
       }
-    }
-  ]
-}
+    ]
+  }'
 ```
 
-**Response**:
-```json
-{
-  "message": "Models trained successfully",
-  "users_count": 20,
-  "products_count": 15,
-  "model_saved": true
-}
+### POST /train/from-db
+**Train models using data from database**
+```bash
+curl -X POST http://localhost:8000/train/from-db
 ```
 
-### POST /train/from-db - Train from Database
+## Recommendation Endpoints
 
-**Description**: Train models using existing database data
-
-**Authentication**: None required
-
-**Response**:
-```json
-{
-  "message": "Models trained successfully from database",
-  "users_count": 25,
-  "products_count": 18,
-  "model_saved": true
-}
+### POST /recommendations
+**Get personalized recommendations**
+```bash
+curl -X POST http://localhost:8000/recommendations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user_001",
+    "algorithm": "hybrid",
+    "n_recommendations": 5,
+    "category_filter": "electronics"
+  }'
 ```
-
-### GET /models/status - Model Status
-
-**Description**: Get current model training status
-
-**Authentication**: None required
-
-**Response**:
+**Response:**
 ```json
 {
-  "is_trained": true,
-  "users_count": 25,
-  "products_count": 18,
-  "algorithms_available": ["user_based", "content_based", "hybrid"]
-}
-```
-
-### POST /models/load - Load Model
-
-**Description**: Load pre-trained model from file
-
-**Authentication**: None required
-
-**Response**:
-```json
-{
-  "message": "Model loaded successfully",
-  "is_trained": true
-}
-```
-
-## 🎯 Recommendation Endpoints
-
-### POST /recommendations - Get Recommendations
-
-**Description**: Get personalized product recommendations
-
-**Authentication**: None required
-
-**Request Body**:
-```json
-{
-  "user_id": "user_123",
-  "algorithm": "hybrid",
-  "n_recommendations": 5,
-  "category_filter": "electronics"
-}
-```
-
-**Parameters**:
-- `user_id` (string, required): User identifier
-- `algorithm` (string, optional): Recommendation algorithm (`user_based`, `content_based`, `hybrid`)
-- `n_recommendations` (integer, optional): Number of recommendations (1-20)
-- `category_filter` (string, optional): Filter by product category
-
-**Response**:
-```json
-{
-  "user_id": "user_123",
+  "user_id": "user_001",
   "recommendations": [
     {
       "product_id": "PROD002",
-      "name": "Samsung Galaxy S24",
-      "category": "electronics",
-      "price": 899.99,
-      "score": 0.85
-    },
-    {
-      "product_id": "PROD003",
-      "name": "MacBook Air M3",
-      "category": "electronics",
-      "price": 1199.99,
-      "score": 0.78
+      "product_name": "Samsung Galaxy S24",
+      "score": 0.85,
+      "reason": "Based on your purchase history"
     }
   ],
   "algorithm": "hybrid",
   "generated_at": "2024-01-15T10:30:00Z",
-  "execution_time": 0.045
+  "execution_time": 0.15
 }
 ```
 
-### POST /trending-products - Get Trending Products
-
-**Description**: Get trending products based on recent user behavior
-
-**Authentication**: None required
-
-**Request Body**:
-```json
-{
-  "category": "electronics",
-  "limit": 10,
-  "timeframe_days": 7
-}
-```
-
-**Parameters**:
-- `category` (string, optional): Filter by product category
-- `limit` (integer, optional): Number of trending products (1-50)
-- `timeframe_days` (integer, optional): Time window in days (1-30)
-
-**Response**:
-```json
-[
-  {
-    "product_id": "PROD001",
-    "name": "iPhone 15 Pro",
-    "category": "electronics",
-    "price": 999.99,
-    "trending_score": 15.5,
-    "trending_rank": 1
-  },
-  {
-    "product_id": "PROD002",
-    "name": "Samsung Galaxy S24",
-    "category": "electronics",
-    "price": 899.99,
-    "trending_score": 12.3,
-    "trending_rank": 2
-  }
-]
-```
-
-## 📊 Behavior Tracking Endpoints
-
-### POST /behaviors - Track User Behavior
-
-**Description**: Track user behavior for recommendation learning
-
-**Authentication**: None required
-
-**Request Body**:
-```json
-{
-  "user_id": "user_123",
-  "product_id": "PROD001",
-  "behavior_type": "view",
-  "session_id": "sess_abc123",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "metadata": {
-    "page_url": "/product/PROD001",
-    "referrer": "search",
-    "user_agent": "Mozilla/5.0..."
-  }
-}
-```
-
-**Parameters**:
-- `user_id` (string, required): User identifier
-- `product_id` (string, required): Product identifier
-- `behavior_type` (string, required): Behavior type (`view`, `cart`, `purchase`, `wishlist`)
-- `session_id` (string, optional): Session identifier
-- `timestamp` (string, optional): ISO timestamp
-- `metadata` (object, optional): Additional behavior data
-
-**Response**:
-```json
-{
-  "message": "Behavior tracked successfully",
-  "user_id": "user_123",
-  "product_id": "PROD001",
-  "behavior_type": "view"
-}
-```
-
-### GET /behaviors/{user_id} - Get User Behaviors
-
-**Description**: Get user behavior history
-
-**Authentication**: None required
-
-**Parameters**:
-- `user_id` (path, required): User identifier
-- `limit` (query, optional): Number of behaviors to return (1-1000)
-
-**Response**:
-```json
-{
-  "user_id": "user_123",
-  "behaviors": [
-    {
-      "behavior_id": 1,
-      "product_id": "PROD001",
-      "behavior_type": "view",
-      "timestamp": "2024-01-15T10:30:00Z",
-      "session_id": "sess_abc123"
-    },
-    {
-      "behavior_id": 2,
-      "product_id": "PROD002",
-      "behavior_type": "purchase",
-      "timestamp": "2024-01-15T11:00:00Z",
-      "session_id": "sess_abc123"
-    }
-  ],
-  "count": 2
-}
-```
-
-## 🔒 Secured Endpoints
-
-### GET /users/{user_id}/stats - Get User Statistics
-
-**Description**: Get user analytics and behavior statistics
-
-**Authentication**: API key required (`X-API-Key` header)
-
-**Rate Limiting**: 10 requests per minute per user
-
-**Parameters**:
-- `user_id` (path, required): User identifier (alphanumeric, max 50 chars)
-
-**Response**:
-```json
-{
-  "user_id": "user_123",
-  "total_interactions": 68,
-  "unique_products": 23,
-  "recent_activity_7_days": 15,
-  "behavior_summary": {
-    "view_count": 45,
-    "cart_count": 12,
-    "purchase_count": 8,
-    "wishlist_count": 3
-  }
-}
-```
-
-**Security Features**:
-- Input validation for user ID format
-- Rate limiting per user
-- API key authentication
-- Data sanitization (no raw behavior data)
-- Access logging for security monitoring
-
-## 🚨 Error Handling
-
-### HTTP Status Codes
-
-- `200 OK`: Successful request
-- `400 Bad Request`: Invalid input parameters
-- `401 Unauthorized`: Missing or invalid API key
-- `429 Too Many Requests`: Rate limit exceeded
-- `500 Internal Server Error`: Server error (graceful handling)
-
-### Error Response Format
-
-```json
-{
-  "detail": "User-friendly error message",
-  "status": "error"
-}
-```
-
-### Common Error Scenarios
-
-#### Invalid User ID Format
-```json
-{
-  "detail": "Invalid user ID format"
-}
-```
-
-#### Missing API Key
-```json
-{
-  "detail": "API key required for accessing user statistics"
-}
-```
-
-#### Rate Limit Exceeded
-```json
-{
-  "detail": "Rate limit exceeded. Try again later."
-}
-```
-
-#### Database Error (Graceful)
-```json
-{
-  "user_id": "user_123",
-  "total_interactions": 0,
-  "unique_products": 0,
-  "recent_activity_7_days": 0,
-  "behavior_summary": {
-    "view_count": 0,
-    "cart_count": 0,
-    "purchase_count": 0,
-    "wishlist_count": 0
-  }
-}
-```
-
-## 📝 Usage Examples
-
-### Complete Workflow Example
-
+### POST /trending-products
+**Get trending products**
 ```bash
-# 1. Check API health
-curl http://localhost:8000/health
-
-# 2. Train models with sample data
-curl -X POST http://localhost:8000/train \
-  -H "Content-Type: application/json" \
-  -d @sample_data.json
-
-# 3. Track user behavior
-curl -X POST http://localhost:8000/behaviors \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "user_123",
-    "product_id": "PROD001",
-    "behavior_type": "view"
-  }'
-
-# 4. Get recommendations
-curl -X POST http://localhost:8000/recommendations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "user_123",
-    "algorithm": "hybrid",
-    "n_recommendations": 5
-  }'
-
-# 5. Get trending products
 curl -X POST http://localhost:8000/trending-products \
   -H "Content-Type: application/json" \
   -d '{
@@ -494,144 +141,424 @@ curl -X POST http://localhost:8000/trending-products \
     "limit": 10,
     "timeframe_days": 7
   }'
+```
 
-# 6. Get user statistics (requires API key)
-curl -X GET http://localhost:8000/users/user_123/stats \
+## Behavior Tracking Endpoints
+
+### POST /behaviors
+**Track user behavior**
+```bash
+curl -X POST http://localhost:8000/behaviors \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user_001",
+    "product_id": "PROD001",
+    "behavior_type": "view",
+    "session_id": "session_123",
+    "metadata": {
+      "page": "product_detail",
+      "duration": 30
+    }
+  }'
+```
+
+### GET /behaviors/{user_id}
+**Get user behaviors**
+```bash
+curl http://localhost:8000/behaviors/user_001?limit=100
+```
+
+## Secured Endpoints
+
+### GET /users/{user_id}/stats
+**Get user statistics (requires API key)**
+```bash
+curl http://localhost:8000/users/user_001/stats \
   -H "X-API-Key: magento-recommendation-key-2024"
 ```
+**Response:**
+```json
+{
+  "user_id": "user_001",
+  "total_interactions": 25,
+  "unique_products": 8,
+  "recent_activity_7_days": 5,
+  "behavior_summary": {
+    "view_count": 15,
+    "cart_count": 5,
+    "purchase_count": 3,
+    "wishlist_count": 2
+  }
+}
+```
 
-### Python Client Example
+## Model Management Endpoints
 
+### GET /models/status
+**Check model training status**
+```bash
+curl http://localhost:8000/models/status
+```
+
+### POST /models/load
+**Load trained models**
+```bash
+curl -X POST http://localhost:8000/models/load
+```
+
+## FBT (Frequently Bought Together) Endpoints
+
+### POST /transactions/purchase
+**Track a complete purchase transaction for FBT analysis**
+```bash
+curl -X POST http://localhost:8000/transactions/purchase \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user_001",
+    "order_id": "ORDER_12345",
+    "products": [
+      {
+        "product_id": "PROD001",
+        "quantity": 1,
+        "unit_price": 999.99,
+        "total_price": 999.99
+      },
+      {
+        "product_id": "PROD005",
+        "quantity": 1,
+        "unit_price": 249.99,
+        "total_price": 249.99
+      }
+    ],
+    "total_amount": 1249.98,
+    "status": "completed"
+  }'
+```
+**Response:**
+```json
+{
+  "message": "Purchase transaction tracked successfully",
+  "user_id": "user_001",
+  "order_id": "ORDER_12345",
+  "transaction_id": "txn_ORDER_12345_1705312200",
+  "products_count": 2,
+  "total_amount": 1249.98,
+  "execution_time": 0.05
+}
+```
+
+### POST /fbt/generate
+**Generate association rules for Frequently Bought Together**
+```bash
+curl -X POST http://localhost:8000/fbt/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "min_support": 0.01,
+    "min_confidence": 0.3,
+    "clear_existing": true
+  }'
+```
+**Response:**
+```json
+{
+  "status": "success",
+  "rules_generated": 15,
+  "transactions_processed": 250,
+  "frequent_itemsets": 45,
+  "min_support": 0.01,
+  "min_confidence": 0.3,
+  "execution_time": 2.34
+}
+```
+
+### POST /fbt/recommendations
+**Get frequently bought together products for a given product**
+```bash
+curl -X POST http://localhost:8000/fbt/recommendations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_id": "PROD001",
+    "limit": 5,
+    "min_confidence": 0.3
+  }'
+```
+**Response:**
+```json
+{
+  "product_id": "PROD001",
+  "associations": [
+    {
+      "product_id": "PROD005",
+      "product_name": "AirPods Pro",
+      "category": "electronics",
+      "price": 249.99,
+      "support": 0.08,
+      "confidence": 0.85,
+      "lift": 3.2
+    },
+    {
+      "product_id": "PROD013",
+      "product_name": "iPhone Case",
+      "category": "accessories",
+      "price": 19.99,
+      "support": 0.09,
+      "confidence": 0.92,
+      "lift": 4.1
+    }
+  ],
+  "count": 2,
+  "min_confidence": 0.3,
+  "execution_time": 0.02
+}
+```
+
+### GET /fbt/rules
+**Get all association rules for analysis**
+```bash
+curl "http://localhost:8000/fbt/rules?min_confidence=0.3&limit=1000"
+```
+**Response:**
+```json
+{
+  "rules": [
+    {
+      "product_id": "PROD001",
+      "associated_product_id": "PROD005",
+      "product_name": "iPhone 15 Pro",
+      "associated_product_name": "AirPods Pro",
+      "support": 0.08,
+      "confidence": 0.85,
+      "lift": 3.2
+    }
+  ],
+  "count": 15,
+  "min_confidence": 0.3,
+  "execution_time": 0.05
+}
+```
+
+### DELETE /fbt/rules
+**Clear all association rules (useful for regeneration)**
+```bash
+curl -X DELETE http://localhost:8000/fbt/rules
+```
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Association rules cleared"
+}
+```
+
+### GET /transactions
+**Get purchase transactions for analysis**
+```bash
+curl "http://localhost:8000/transactions?user_id=user_001&limit=100"
+```
+**Response:**
+```json
+{
+  "transactions": [
+    {
+      "transaction_id": "txn_ORDER_12345_1705312200",
+      "user_id": "user_001",
+      "order_id": "ORDER_12345",
+      "purchase_date": "2024-01-15T10:30:00Z",
+      "total_amount": 1249.98,
+      "status": "completed",
+      "items": [
+        {
+          "product_id": "PROD001",
+          "quantity": 1,
+          "unit_price": 999.99,
+          "total_price": 999.99
+        },
+        {
+          "product_id": "PROD005",
+          "quantity": 1,
+          "unit_price": 249.99,
+          "total_price": 249.99
+        }
+      ]
+    }
+  ],
+  "count": 1,
+  "user_id": "user_001"
+}
+```
+
+## Error Handling
+
+### Common Error Responses
+
+**400 Bad Request:**
+```json
+{
+  "detail": "Invalid user ID format"
+}
+```
+
+**401 Unauthorized:**
+```json
+{
+  "detail": "API key required for accessing user statistics"
+}
+```
+
+**429 Too Many Requests:**
+```json
+{
+  "detail": "Rate limit exceeded. Try again later."
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+  "message": "Training failed. Please check your data and try again.",
+  "status": "error"
+}
+```
+
+## Usage Examples
+
+### Python Example
 ```python
 import requests
-import json
 
-BASE_URL = "http://localhost:8000"
-API_KEY = "magento-recommendation-key-2024"
-
-# Track behavior
-def track_behavior(user_id, product_id, behavior_type):
-    response = requests.post(f"{BASE_URL}/behaviors", json={
-        "user_id": user_id,
-        "product_id": product_id,
-        "behavior_type": behavior_type
-    })
-    return response.json()
-
-# Get recommendations
-def get_recommendations(user_id, algorithm="hybrid", limit=5):
-    response = requests.post(f"{BASE_URL}/recommendations", json={
-        "user_id": user_id,
-        "algorithm": algorithm,
-        "n_recommendations": limit
-    })
-    return response.json()
-
-# Get user statistics
-def get_user_stats(user_id):
-    headers = {"X-API-Key": API_KEY}
-    response = requests.get(f"{BASE_URL}/users/{user_id}/stats", headers=headers)
-    return response.json()
-
-# Usage
-track_behavior("user_123", "PROD001", "view")
-recommendations = get_recommendations("user_123")
-stats = get_user_stats("user_123")
-```
-
-### JavaScript Client Example
-
-```javascript
-const BASE_URL = 'http://localhost:8000';
-const API_KEY = 'magento-recommendation-key-2024';
-
-// Track behavior
-async function trackBehavior(userId, productId, behaviorType) {
-    const response = await fetch(`${BASE_URL}/behaviors`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            user_id: userId,
-            product_id: productId,
-            behavior_type: behaviorType
-        })
-    });
-    return await response.json();
-}
-
-// Get recommendations
-async function getRecommendations(userId, algorithm = 'hybrid', limit = 5) {
-    const response = await fetch(`${BASE_URL}/recommendations`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            user_id: userId,
-            algorithm: algorithm,
-            n_recommendations: limit
-        })
-    });
-    return await response.json();
-}
-
-// Get user statistics
-async function getUserStats(userId) {
-    const response = await fetch(`${BASE_URL}/users/${userId}/stats`, {
-        headers: {
-            'X-API-Key': API_KEY
+# Track purchase transaction
+transaction_data = {
+    "user_id": "user_001",
+    "order_id": "ORDER_12345",
+    "products": [
+        {
+            "product_id": "PROD001",
+            "quantity": 1,
+            "unit_price": 999.99,
+            "total_price": 999.99
         }
-    });
-    return await response.json();
+    ],
+    "total_amount": 999.99
 }
 
-// Usage
-trackBehavior('user_123', 'PROD001', 'view');
-getRecommendations('user_123').then(console.log);
-getUserStats('user_123').then(console.log);
+response = requests.post(
+    "http://localhost:8000/transactions/purchase",
+    json=transaction_data
+)
+print(response.json())
+
+# Generate FBT rules
+fbt_data = {
+    "min_support": 0.01,
+    "min_confidence": 0.3,
+    "clear_existing": True
+}
+
+response = requests.post(
+    "http://localhost:8000/fbt/generate",
+    json=fbt_data
+)
+print(response.json())
+
+# Get FBT recommendations
+fbt_request = {
+    "product_id": "PROD001",
+    "limit": 5,
+    "min_confidence": 0.3
+}
+
+response = requests.post(
+    "http://localhost:8000/fbt/recommendations",
+    json=fbt_request
+)
+print(response.json())
 ```
 
-## 🔧 Configuration
+### JavaScript Example
+```javascript
+// Track purchase transaction
+const transactionData = {
+  user_id: "user_001",
+  order_id: "ORDER_12345",
+  products: [
+    {
+      product_id: "PROD001",
+      quantity: 1,
+      unit_price: 999.99,
+      total_price: 999.99
+    }
+  ],
+  total_amount: 999.99
+};
 
-### Environment Variables
+fetch('http://localhost:8000/transactions/purchase', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(transactionData)
+})
+.then(response => response.json())
+.then(data => console.log(data));
 
-```bash
-# API Configuration
-API_KEY=magento-recommendation-key-2024
-MAX_REQUESTS_PER_MINUTE=10
+// Generate FBT rules
+const fbtData = {
+  min_support: 0.01,
+  min_confidence: 0.3,
+  clear_existing: true
+};
 
-# Database Configuration
-DATABASE_URL=mysql://user:password@mariadb:3306/recommendations
-
-# Redis Configuration
-REDIS_URL=redis://redis:6379
-
-# ML Configuration
-MODEL_CACHE_TTL=3600
-MAX_RECOMMENDATIONS=10
+fetch('http://localhost:8000/fbt/generate', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(fbtData)
+})
+.then(response => response.json())
+.then(data => console.log(data));
 ```
 
-## 📊 Performance Guidelines
+## FBT Algorithm Details
 
-### Response Time Targets
-- **Health checks**: < 50ms
-- **Behavior tracking**: < 100ms
-- **Recommendations**: < 200ms
-- **User statistics**: < 150ms
+### Association Rules Metrics
 
-### Best Practices
-1. **Use caching**: Recommendations are cached for 1 hour
-2. **Batch operations**: Track multiple behaviors efficiently
-3. **Error handling**: Always handle potential errors gracefully
-4. **Rate limiting**: Respect API rate limits
-5. **Input validation**: Validate data before sending
+**Support:** How often the itemset appears in transactions
+- Formula: `Support(X,Y) = Count(X,Y) / Total_Transactions`
+- Example: If iPhone + AirPods appear in 80 out of 1000 transactions, support = 0.08
 
-## 📞 Support
+**Confidence:** How likely Y is bought when X is bought
+- Formula: `Confidence(X→Y) = Support(X,Y) / Support(X)`
+- Example: If 80% of iPhone buyers also buy AirPods, confidence = 0.8
 
-For API-related questions or issues:
-- **Email:** jsjaimohan@gmail.com
-- **Developer:** J S JAIMOHAN
+**Lift:** How much more likely the rule is compared to random chance
+- Formula: `Lift(X→Y) = Confidence(X→Y) / Support(Y)`
+- Example: If lift = 3.2, the combination is 3.2x more likely than random
 
-This API is designed for internal Magento integration with focus on simplicity and performance.
+### Recommended Parameters
+
+**For Small Datasets (< 1000 transactions):**
+- `min_support`: 0.05 (5%)
+- `min_confidence`: 0.3 (30%)
+
+**For Medium Datasets (1000-10000 transactions):**
+- `min_support`: 0.01 (1%)
+- `min_confidence`: 0.3 (30%)
+
+**For Large Datasets (> 10000 transactions):**
+- `min_support`: 0.005 (0.5%)
+- `min_confidence`: 0.2 (20%)
+
+## Performance Considerations
+
+1. **Rule Generation:** Can take 1-5 minutes for large datasets
+2. **Recommendation Retrieval:** Typically < 100ms
+3. **Transaction Tracking:** < 50ms per transaction
+4. **Database Storage:** Optimized with proper indexes
+
+## Security Notes
+
+1. **API Key Protection:** Sensitive endpoints require valid API key
+2. **Input Validation:** All user inputs are validated and sanitized
+3. **Rate Limiting:** Applied to sensitive endpoints
+4. **Error Handling:** Stack traces are not exposed to external users

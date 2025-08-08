@@ -11,11 +11,17 @@ from typing import Dict, List, Any, Optional
 from recommendation_service import RecommendationService
 from behavior_service import BehaviorService
 from health_service import HealthService
+from fbt_service import FBTService  # NEW: FBT service
 
 # Import models
 from models import (
     RecommendationRequest, RecommendationResponse,
-    TrainingRequest, UserBehavior, HealthResponse
+    TrainingRequest, UserBehavior, HealthResponse,
+    # NEW: FBT models
+    PurchaseTransactionRequest, FBTGenerationRequest, FBTRequest,
+    FBTGenerationResponse, FBTResponse, TransactionResponse, AssociationRuleResponse,
+    # NEW: Product management models
+    ProductCreateRequest, ProductUpdateRequest, ProductResponse
 )
 
 # Configure logging
@@ -26,6 +32,7 @@ logger = logging.getLogger(__name__)
 recommendation_service = RecommendationService()
 behavior_service = BehaviorService()
 health_service = HealthService()
+fbt_service = FBTService()  # NEW: Initialize FBT service
 
 # Security configurations
 ALLOWED_USER_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{1,50}$')
@@ -325,6 +332,347 @@ async def get_user_stats(user_id: str, request: Request, x_api_key: Optional[str
             "user_id": user_id,
             "error": "Unable to retrieve user statistics at this time",
             "status": "error"
+        }
+
+# FBT (Frequently Bought Together) Endpoints
+
+@app.post("/transactions/purchase", response_model=TransactionResponse)
+async def track_purchase_transaction(request: PurchaseTransactionRequest):
+    """Track a complete purchase transaction for FBT analysis"""
+    try:
+        # Convert Pydantic models to dict for service
+        products = []
+        for item in request.products:
+            products.append({
+                "product_id": item.product_id,
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "total_price": item.total_price
+            })
+        
+        result = behavior_service.track_purchase_transaction(
+            user_id=request.user_id,
+            order_id=request.order_id,
+            products=products,
+            total_amount=request.total_amount
+        )
+        
+        return TransactionResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Error tracking purchase transaction: {e}")
+        return TransactionResponse(
+            message="Failed to track purchase transaction",
+            user_id=request.user_id,
+            order_id=request.order_id,
+            transaction_id="",
+            products_count=0,
+            total_amount=0,
+            execution_time=0
+        )
+
+@app.post("/fbt/generate", response_model=FBTGenerationResponse)
+async def generate_fbt_rules(request: FBTGenerationRequest):
+    """Generate association rules for Frequently Bought Together"""
+    try:
+        # Clear existing rules if requested
+        if request.clear_existing:
+            fbt_service.clear_association_rules()
+        
+        result = fbt_service.generate_association_rules(
+            min_support=request.min_support,
+            min_confidence=request.min_confidence
+        )
+        
+        return FBTGenerationResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Error generating FBT rules: {e}")
+        return FBTGenerationResponse(
+            status="error",
+            rules_generated=0,
+            transactions_processed=0,
+            frequent_itemsets=0,
+            min_support=request.min_support,
+            min_confidence=request.min_confidence,
+            execution_time=0,
+            message=f"Error generating rules: {str(e)}"
+        )
+
+@app.post("/fbt/recommendations", response_model=FBTResponse)
+async def get_fbt_recommendations(request: FBTRequest):
+    """Get frequently bought together products for a given product"""
+    try:
+        result = fbt_service.get_frequently_bought_together(
+            product_id=request.product_id,
+            limit=request.limit,
+            min_confidence=request.min_confidence
+        )
+        
+        return FBTResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Error getting FBT recommendations for {request.product_id}: {e}")
+        return FBTResponse(
+            product_id=request.product_id,
+            associations=[],
+            count=0,
+            min_confidence=request.min_confidence,
+            execution_time=0
+        )
+
+@app.get("/fbt/rules", response_model=AssociationRuleResponse)
+async def get_all_association_rules(min_confidence: float = 0.3, limit: int = 1000):
+    """Get all association rules for analysis"""
+    try:
+        result = fbt_service.get_all_association_rules(min_confidence, limit)
+        return AssociationRuleResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Error getting association rules: {e}")
+        return AssociationRuleResponse(
+            rules=[],
+            count=0,
+            min_confidence=min_confidence,
+            execution_time=0
+        )
+
+@app.delete("/fbt/rules")
+async def clear_association_rules():
+    """Clear all association rules (useful for regeneration)"""
+    try:
+        result = fbt_service.clear_association_rules()
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error clearing association rules: {e}")
+        return {
+            "status": "error",
+            "message": f"Error clearing rules: {str(e)}"
+        }
+
+@app.get("/transactions")
+async def get_purchase_transactions(user_id: str = None, limit: int = 100):
+    """Get purchase transactions for analysis"""
+    try:
+        result = behavior_service.get_purchase_transactions(user_id, limit)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting purchase transactions: {e}")
+        return {
+            "transactions": [],
+            "count": 0,
+            "user_id": user_id,
+            "error": str(e)
+        }
+
+# Product Management Endpoints
+@app.post("/products", response_model=ProductResponse)
+async def create_product(request: ProductCreateRequest):
+    """Create a new product in the recommendation system"""
+    try:
+        from database import db_manager
+        
+        # Validate required fields
+        if not request.product_id or not request.name or not request.category:
+            raise HTTPException(status_code=400, detail="product_id, name, and category are required")
+        
+        # Create product data dictionary
+        product_data = {
+            "product_id": request.product_id,
+            "name": request.name,
+            "category": request.category,
+            "subcategory": request.subcategory,
+            "price": request.price,
+            "attributes": request.attributes,
+            "description": request.description,
+            "brand": request.brand,
+            "tags": request.tags
+        }
+        
+        # Create product in database
+        success = db_manager.create_product(product_data)
+        
+        if not success:
+            raise HTTPException(status_code=409, detail="Product already exists")
+        
+        # Get the created product
+        product = db_manager.get_product(request.product_id)
+        
+        if not product:
+            raise HTTPException(status_code=500, detail="Product created but could not retrieve")
+        
+        return ProductResponse(
+            product_id=product["product_id"],
+            name=product["name"],
+            category=product["category"],
+            subcategory=product["subcategory"],
+            price=product["price"],
+            attributes=product["attributes"],
+            description=product["description"],
+            brand=product["brand"],
+            tags=product["tags"],
+            created_at=product["created_at"],
+            updated_at=product["updated_at"],
+            message="Product created successfully",
+            status="success"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating product: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating product: {str(e)}")
+
+@app.get("/products/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: str):
+    """Get a specific product by ID"""
+    try:
+        from database import db_manager
+        
+        product = db_manager.get_product(product_id)
+        
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        return ProductResponse(
+            product_id=product["product_id"],
+            name=product["name"],
+            category=product["category"],
+            subcategory=product["subcategory"],
+            price=product["price"],
+            attributes=product["attributes"],
+            description=product["description"],
+            brand=product["brand"],
+            tags=product["tags"],
+            created_at=product["created_at"],
+            updated_at=product["updated_at"],
+            message="Product retrieved successfully",
+            status="success"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting product {product_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting product: {str(e)}")
+
+@app.put("/products/{product_id}", response_model=ProductResponse)
+async def update_product(product_id: str, request: ProductUpdateRequest):
+    """Update an existing product"""
+    try:
+        from database import db_manager
+        
+        # Convert request to dictionary, excluding None values
+        update_data = {}
+        if request.name is not None:
+            update_data["name"] = request.name
+        if request.category is not None:
+            update_data["category"] = request.category
+        if request.subcategory is not None:
+            update_data["subcategory"] = request.subcategory
+        if request.price is not None:
+            update_data["price"] = request.price
+        if request.attributes is not None:
+            update_data["attributes"] = request.attributes
+        if request.description is not None:
+            update_data["description"] = request.description
+        if request.brand is not None:
+            update_data["brand"] = request.brand
+        if request.tags is not None:
+            update_data["tags"] = request.tags
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        # Update product
+        success = db_manager.update_product(product_id, update_data)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Get the updated product
+        product = db_manager.get_product(product_id)
+        
+        if not product:
+            raise HTTPException(status_code=500, detail="Product updated but could not retrieve")
+        
+        return ProductResponse(
+            product_id=product["product_id"],
+            name=product["name"],
+            category=product["category"],
+            subcategory=product["subcategory"],
+            price=product["price"],
+            attributes=product["attributes"],
+            description=product["description"],
+            brand=product["brand"],
+            tags=product["tags"],
+            created_at=product["created_at"],
+            updated_at=product["updated_at"],
+            message="Product updated successfully",
+            status="success"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating product {product_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating product: {str(e)}")
+
+@app.delete("/products/{product_id}")
+async def delete_product(product_id: str):
+    """Soft delete a product (set status to inactive)"""
+    try:
+        from database import db_manager
+        
+        success = db_manager.delete_product(product_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        return {
+            "status": "success",
+            "message": f"Product {product_id} deleted successfully",
+            "product_id": product_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting product {product_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting product: {str(e)}")
+
+@app.get("/products")
+async def get_all_products(limit: int = 100, category: str = None):
+    """Get all products with optional filtering"""
+    try:
+        from database import db_manager
+        
+        products = db_manager.get_all_products()
+        
+        # Apply category filter if specified
+        if category:
+            products = [p for p in products if p.get("category") == category]
+        
+        # Apply limit
+        products = products[:limit]
+        
+        return {
+            "products": products,
+            "count": len(products),
+            "category_filter": category,
+            "limit": limit
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting products: {e}")
+        return {
+            "products": [],
+            "count": 0,
+            "category_filter": category,
+            "limit": limit,
+            "error": str(e)
         }
 
 if __name__ == "__main__":

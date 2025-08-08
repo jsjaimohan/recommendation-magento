@@ -40,6 +40,7 @@ This document provides a comprehensive overview of the Magento Recommendation Sy
 │  Services (Business Logic)                                │
 │  ├── RecommendationService (ML Engine)                    │
 │  ├── BehaviorService (User Analytics)                     │
+│  ├── FBTService (Frequently Bought Together)              │
 │  └── HealthService (System Monitoring)                    │
 ├─────────────────────────────────────────────────────────────┤
 │  Models (Data Layer)                                      │
@@ -62,6 +63,7 @@ Magento-Recommendation/
 │   ├── models.py                   # Pydantic models/schemas
 │   ├── recommendation_service.py    # ML and recommendation logic
 │   ├── behavior_service.py         # User behavior tracking
+│   ├── fbt_service.py              # Frequently Bought Together logic
 │   ├── health_service.py           # Health checks and monitoring
 │   └── database.py                 # Database operations
 ├── docs/
@@ -126,6 +128,20 @@ Magento-Recommendation/
 - `track_behavior()` - Save user behavior to database
 - `get_user_behaviors()` - Retrieve user behavior history
 - `get_user_stats()` - Generate user analytics
+
+#### FBTService (`fbt_service.py`)
+
+**Responsibilities**:
+- Frequently Bought Together (FBT) analysis
+- Association rule mining using Apriori algorithm
+- FBT recommendation generation
+- Rule persistence and management
+
+**Key Methods**:
+- `generate_association_rules()` - Generate FBT rules from transactions
+- `apriori_algorithm()` - Find frequent itemsets
+- `get_frequently_bought_together()` - Get FBT recommendations
+- `clear_association_rules()` - Clear stored rules
 
 #### HealthService (`health_service.py`)
 
@@ -230,6 +246,45 @@ CREATE TABLE ab_tests (
     variant VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+-- FBT (Frequently Bought Together) tables
+-- Purchase transactions table
+CREATE TABLE purchase_transactions (
+    transaction_id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255),
+    order_id VARCHAR(255),
+    total_amount DECIMAL(10,2),
+    status VARCHAR(50) DEFAULT 'completed',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Transaction items table
+CREATE TABLE transaction_items (
+    transaction_id VARCHAR(255),
+    product_id VARCHAR(255),
+    quantity INT DEFAULT 1,
+    unit_price DECIMAL(10,2),
+    total_price DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (transaction_id, product_id),
+    FOREIGN KEY (transaction_id) REFERENCES purchase_transactions(transaction_id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+);
+
+-- Product associations table (FBT rules)
+CREATE TABLE product_associations (
+    product_id VARCHAR(255),
+    associated_product_id VARCHAR(255),
+    support DECIMAL(5,4),      -- How often they appear together
+    confidence DECIMAL(5,4),    -- How likely Y is bought with X
+    lift DECIMAL(10,4),        -- How much more likely than random
+    rule_type VARCHAR(50) DEFAULT 'frequently_bought_together',
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (product_id, associated_product_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    FOREIGN KEY (associated_product_id) REFERENCES products(product_id) ON DELETE CASCADE
 );
 ```
 
